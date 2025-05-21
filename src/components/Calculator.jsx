@@ -1,7 +1,8 @@
 // src/components/Calculator.jsx
 
 import { useState } from 'react'
-import { calculateZScore, zScoreToPercentile } from '../utils/lmsUtils'
+import { calculateAllPercentiles } from '../utils/lmsUtils'
+import { calcularEdadPediatrica, formatAgeDisplay } from '../utils/ageUtils'
 import ResultCard from './ResultCard'
 
 import weightData from '../data/weight_for_age.json'
@@ -23,106 +24,16 @@ const Calculator = () => {
   const [length, setLength] = useState('')
   const [head, setHead] = useState('')
   const [results, setResults] = useState(null)
-
   const [birthDate, setBirthDate] = useState('')
   const [ageError, setAgeError] = useState('')
 
   const handleCalculate = () => {
-    if (!age || age.completedMonths === null) {
-      alert('La edad no es válida. Verifique la fecha de nacimiento.')
-      return
-    }
-
-    const res = {}
-
-    const ageStr = age.completedMonths.toString()
-
-    if (age.completedMonths < 0 || age.completedMonths > 24) {
-      alert(
-        'La edad debe estar entre 0 y 24 meses (según los datos disponibles).'
-      )
-      return
-    }
-
-    if (weight && datasets.weight[sex][ageStr]) {
-      const z = calculateZScore(
-        datasets.weight[sex][ageStr],
-        parseFloat(weight)
-      )
-      res.weight = { z, percentile: zScoreToPercentile(z) }
-    }
-
-    if (length && datasets.length[sex][ageStr]) {
-      const z = calculateZScore(
-        datasets.length[sex][ageStr],
-        parseFloat(length)
-      )
-      res.length = { z, percentile: zScoreToPercentile(z) }
-    }
-
-    if (length && weight && datasets.weightLength[sex][Math.round(length)]) {
-      const z = calculateZScore(
-        datasets.weightLength[sex][Math.round(length)],
-        parseFloat(weight)
-      )
-      res.weightLength = { z, percentile: zScoreToPercentile(z) }
-    }
-
-    if (head && datasets.head[sex][ageStr]) {
-      const z = calculateZScore(datasets.head[sex][ageStr], parseFloat(head))
-      res.head = { z, percentile: zScoreToPercentile(z) }
-    }
-
-    setResults(res)
-  }
-
-  const calcularEdadPediatrica = (fechaNacimiento) => {
-    const hoy = new Date()
-    const nacimiento = new Date(fechaNacimiento)
-
-    // Cálculo preciso para pediatría
-    let años = hoy.getFullYear() - nacimiento.getFullYear()
-    let meses = hoy.getMonth() - nacimiento.getMonth()
-    let dias = hoy.getDate() - nacimiento.getDate()
-
-    // Ajustar por días negativos
-    if (dias < 0) {
-      meses--
-      // Obtener último día del mes anterior
-      const ultimoDiaMesAnterior = new Date(
-        hoy.getFullYear(),
-        hoy.getMonth(),
-        0
-      ).getDate()
-      dias += ultimoDiaMesAnterior
-    }
-
-    // Ajustar por meses negativos
-    if (meses < 0) {
-      años--
-      meses += 12
-    }
-
-    // Meses completos (para percentiles)
-    const completedMonths = años * 12 + meses
-
-    // Meses con fracción (para visualización)
-    const mesesDecimal = completedMonths + dias / 30.437
-
-    // Cálculo de semanas y días
-    const totalDias = Math.floor((hoy - nacimiento) / (1000 * 60 * 60 * 24))
-    const semanasCompletas = Math.floor(totalDias / 7)
-    const diasRestantes = totalDias % 7
-
-    return {
-      years: años,
-      months: meses,
-      days: dias,
-      completedMonths: años * 12 + meses,
-      monthsDecimal: parseFloat(mesesDecimal.toFixed(2)),
-      weeks: semanasCompletas,
-      remainingDays: diasRestantes,
-      totalDays: totalDias,
+    try {
+      const inputs = { sex, age, weight, length, head }
+      const res = calculateAllPercentiles(datasets, inputs)
+      setResults(res)
+    } catch (error) {
+      alert(error.message)
     }
   }
 
@@ -148,18 +59,6 @@ const Calculator = () => {
 
   const getTodayDate = () => {
     return new Date().toISOString().split('T')[0]
-  }
-
-  const formatAgeDisplay = (age) => {
-    if (!age) return 'No se pudo calcular la edad'
-
-    if (age.completedMonths < 1) {
-      return `${age.totalDays} días (${age.weeks} semanas y ${age.remainingDays} días)`
-    } else if (age.years < 2) {
-      return `${age.completedMonths} meses y ${age.days} días`
-    } else {
-      return `${age.years} años y ${age.months} meses`
-    }
   }
 
   return (
