@@ -28,16 +28,16 @@ const Calculator = () => {
   const [ageError, setAgeError] = useState('')
 
   const handleCalculate = () => {
-    if (age === null) {
-      alert('La edad no es válida. Verificá la fecha de nacimiento.')
+    if (!age || age.completedMonths === null) {
+      alert('La edad no es válida. Verifique la fecha de nacimiento.')
       return
     }
 
     const res = {}
 
-    const ageStr = age.toString()
+    const ageStr = age.completedMonths.toString()
 
-    if (age < 0 || age > 24) {
+    if (age.completedMonths < 0 || age.completedMonths > 24) {
       alert(
         'La edad debe estar entre 0 y 24 meses (según los datos disponibles).'
       )
@@ -76,30 +76,66 @@ const Calculator = () => {
     setResults(res)
   }
 
-  const calcularEdadEnMeses = (fechaNacimiento) => {
+  const calcularEdadPediatrica = (fechaNacimiento) => {
     const hoy = new Date()
     const nacimiento = new Date(fechaNacimiento)
 
+    // Cálculo preciso para pediatría
     let años = hoy.getFullYear() - nacimiento.getFullYear()
     let meses = hoy.getMonth() - nacimiento.getMonth()
     let dias = hoy.getDate() - nacimiento.getDate()
 
-    let totalMeses = años * 12 + meses
-    if (dias < 0) totalMeses -= 1
+    // Ajustar por días negativos
+    if (dias < 0) {
+      meses--
+      // Obtener último día del mes anterior
+      const ultimoDiaMesAnterior = new Date(
+        hoy.getFullYear(),
+        hoy.getMonth(),
+        0
+      ).getDate()
+      dias += ultimoDiaMesAnterior
+    }
 
-    return totalMeses
+    // Ajustar por meses negativos
+    if (meses < 0) {
+      años--
+      meses += 12
+    }
+
+    // Meses completos (para percentiles)
+    const completedMonths = años * 12 + meses
+
+    // Meses con fracción (para visualización)
+    const mesesDecimal = completedMonths + dias / 30.437
+
+    // Cálculo de semanas y días
+    const totalDias = Math.floor((hoy - nacimiento) / (1000 * 60 * 60 * 24))
+    const semanasCompletas = Math.floor(totalDias / 7)
+    const diasRestantes = totalDias % 7
+
+    return {
+      years: años,
+      months: meses,
+      days: dias,
+      completedMonths: años * 12 + meses,
+      monthsDecimal: parseFloat(mesesDecimal.toFixed(2)),
+      weeks: semanasCompletas,
+      remainingDays: diasRestantes,
+      totalDays: totalDias,
+    }
   }
 
   const handleBirthDateChange = (e) => {
     const fecha = e.target.value
     setBirthDate(fecha)
 
-    const meses = calcularEdadEnMeses(fecha)
-    if (meses < 0 || meses > 24) {
+    const edad = calcularEdadPediatrica(fecha)
+    if (edad.completedMonths < 0 || edad.completedMonths > 24) {
       setAge(null)
-      setAgeError('La edad calculada debe estar entre 0 y 24 meses.')
+      setAgeError('La edad debe estar entre 0 y 24 meses.')
     } else {
-      setAge(meses)
+      setAge(edad)
       setAgeError('')
     }
   }
@@ -112,6 +148,18 @@ const Calculator = () => {
 
   const getTodayDate = () => {
     return new Date().toISOString().split('T')[0]
+  }
+
+  const formatAgeDisplay = (age) => {
+    if (!age) return 'No se pudo calcular la edad'
+
+    if (age.completedMonths < 1) {
+      return `${age.totalDays} días (${age.weeks} semanas y ${age.remainingDays} días)`
+    } else if (age.years < 2) {
+      return `${age.completedMonths} meses y ${age.days} días`
+    } else {
+      return `${age.years} años y ${age.months} meses`
+    }
   }
 
   return (
@@ -142,11 +190,19 @@ const Calculator = () => {
             className='border rounded px-2 py-1 w-full'
           />
         </label>
+
         {ageError && <p className='text-red-600 text-sm mt-1'>{ageError}</p>}
-        {age !== null && (
-          <p className='text-sm text-gray-700 mt-1'>
-            Edad calculada: {age} meses
-          </p>
+
+        {age && (
+          <div className='bg-blue-50 p-3 rounded-md mt-2'>
+            <h3 className='font-semibold text-blue-800 mb-1'>
+              Edad calculada:
+            </h3>
+            <p className='text-sm text-gray-800'>{formatAgeDisplay(age)}</p>
+            <p className='text-xs text-gray-600 mt-1'>
+              {age.completedMonths} Meses
+            </p>
+          </div>
         )}
 
         <label>
@@ -155,6 +211,7 @@ const Calculator = () => {
             type='number'
             value={weight}
             onChange={(e) => setWeight(e.target.value)}
+            step='0.01'
             className='border rounded px-2 py-1 w-full'
           />
         </label>
@@ -165,6 +222,7 @@ const Calculator = () => {
             type='number'
             value={length}
             onChange={(e) => setLength(e.target.value)}
+            step='0.1'
             className='border rounded px-2 py-1 w-full'
           />
         </label>
@@ -175,6 +233,7 @@ const Calculator = () => {
             type='number'
             value={head}
             onChange={(e) => setHead(e.target.value)}
+            step='0.1'
             className='border rounded px-2 py-1 w-full'
           />
         </label>
@@ -183,7 +242,7 @@ const Calculator = () => {
           onClick={handleCalculate}
           className='bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700'
         >
-          Calcular
+          Calcular Percentiles
         </button>
       </div>
 
